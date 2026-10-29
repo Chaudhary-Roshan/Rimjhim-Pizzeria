@@ -26,3 +26,4 @@ export async function invokeNeonHelloFunction(): Promise<{
     output: text.trim(),
   };
 }
+

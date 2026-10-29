@@ -40,3 +40,4 @@ export function getNeonAuthConfig() {
     isConfigured: Boolean(process.env.NEON_AUTH_BASE_URL && process.env.NEON_AUTH_JWKS_URL),
   };
 }
+
