@@ -1,5 +1,8 @@
 # Rimjhim Pizzeria — Web App, POS & Admin Platform
 
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FChaudhary-Roshan%2FRimjhim-Pizzeria&env=BACKEND_URL,DATABASE_URL,AUTH_SECRET,NEXT_PUBLIC_STORE_NAME,NEXT_PUBLIC_STORE_PHONE,NEXT_PUBLIC_STORE_WHATSAPP)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new)
+
 > **Live Restaurant Operating System** for Rimjhim Pizzeria (Commercial Area, Satellite Town, Bahawalpur).  
 > Built as a single TypeScript Next.js application that powers three distinct sides connected to a shared database:
 > 1. **Customer Ordering Website** (`/`) — Mobile-first, animated, cart, bottom-sheet item customizer, checkout, WhatsApp click-to-chat, and live status tracker.
