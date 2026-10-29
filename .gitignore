@@ -35,3 +35,4 @@ next-env.d.ts
 
 # database backups
 /backups/*.dump
+.neon
