@@ -1,4 +1,4 @@
-is is m"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { formatRupees } from "@/lib/format";
