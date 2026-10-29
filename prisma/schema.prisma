@@ -1,0 +1,434 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ===== Enums =====
+enum StaffRole {
+  ADMIN
+  OWNER
+  CASHIER
+  KITCHEN
+}
+
+enum ItemKind {
+  SINGLE
+  DEAL
+}
+
+enum OrderChannel {
+  ONLINE
+  POS
+}
+
+enum OrderType {
+  DELIVERY
+  TAKEAWAY
+  DINE_IN
+}
+
+enum OrderStatus {
+  NEW
+  CONFIRMED
+  PREPARING
+  READY
+  OUT_FOR_DELIVERY
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  JAZZCASH
+  EASYPAISA
+  BANK
+}
+
+// ===== Staff =====
+model StaffUser {
+  id             BigInt     @id @default(autoincrement())
+  name           String
+  phone          String     @unique
+  email          String?    @unique
+  passwordHash   String     @map("password_hash")
+  posPinHash     String?    @map("pos_pin_hash")
+  role           StaffRole
+  isActive       Boolean    @default(true) @map("is_active")
+  lastLoginAt    DateTime?  @map("last_login_at") @db.Timestamptz
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  openedShifts   Shift[]    @relation("ShiftOpenedBy")
+  closedShifts   Shift[]    @relation("ShiftClosedBy")
+  createdOrders  Order[]    @relation("OrderCreatedBy")
+  statusLogs     OrderStatusLog[]
+  payments       Payment[]
+  auditLogs      AuditLog[]
+
+  @@map("staff_users")
+}
+
+// ===== Menu =====
+model Category {
+  id        BigInt     @id @default(autoincrement())
+  name      String
+  slug      String     @unique
+  imageUrl  String?    @map("image_url")
+  sortOrder Int        @default(0) @map("sort_order")
+  isActive  Boolean    @default(true) @map("is_active")
+
+  items     MenuItem[]
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id            BigInt              @id @default(autoincrement())
+  categoryId    BigInt              @map("category_id")
+  kind          ItemKind            @default(SINGLE)
+  name          String
+  slug          String              @unique
+  description   String?
+  imageUrl      String?             @map("image_url")
+  tags          String[]            @default([])
+  isAvailable   Boolean             @default(true) @map("is_available")
+  isActive      Boolean             @default(true) @map("is_active")
+  showOnline    Boolean             @default(true) @map("show_online")
+  showPos       Boolean             @default(true) @map("show_pos")
+  isDealOfDay   Boolean             @default(false) @map("is_deal_of_day")
+  validFrom     DateTime?           @map("valid_from") @db.Date
+  validUntil    DateTime?           @map("valid_until") @db.Date
+  availableFrom String?             @map("available_from")
+  availableTo   String?             @map("available_to")
+  sortOrder     Int                 @default(0) @map("sort_order")
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  category      Category            @relation(fields: [categoryId], references: [id])
+  variants      ItemVariant[]
+  dealComponents DealComponent[]    @relation("DealParentItem")
+  asComponentIn DealComponent[]     @relation("ComponentItem")
+  modifierGroups ItemModifierGroup[]
+  orderItems    OrderItem[]
+  banners       Banner[]
+  modifierOptions ModifierOption[]  @relation("LinkedMenuItem")
+
+  @@map("menu_items")
+}
+
+model ItemVariant {
+  id          BigInt          @id @default(autoincrement())
+  menuItemId  BigInt          @map("menu_item_id")
+  name        String          // Small, Medium, Large, Regular
+  price       Int             // whole rupees
+  isAvailable Boolean         @default(true) @map("is_available")
+  sortOrder   Int             @default(0) @map("sort_order")
+
+  menuItem    MenuItem        @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  dealComponents DealComponent[]
+  orderItems  OrderItem[]
+
+  @@unique([menuItemId, name])
+  @@map("item_variants")
+}
+
+model DealComponent {
+  id                  BigInt       @id @default(autoincrement())
+  dealItemId          BigInt       @map("deal_item_id")
+  componentItemId     BigInt?      @map("component_item_id")
+  componentVariantId  BigInt?      @map("component_variant_id")
+  quantity            Int          @default(1)
+  label               String       // "1 Small Pizza (your choice)"
+  sortOrder           Int          @default(0) @map("sort_order")
+
+  dealItem            MenuItem     @relation("DealParentItem", fields: [dealItemId], references: [id], onDelete: Cascade)
+  componentItem       MenuItem?    @relation("ComponentItem", fields: [componentItemId], references: [id])
+  componentVariant    ItemVariant? @relation(fields: [componentVariantId], references: [id])
+
+  @@map("deal_components")
+}
+
+model ModifierGroup {
+  id        BigInt               @id @default(autoincrement())
+  name      String               // "Choose drink", "Choose pizza flavour", "Extras"
+  minSelect Int                  @default(0) @map("min_select")
+  maxSelect Int                  @default(1) @map("max_select")
+
+  options   ModifierOption[]
+  menuItems ItemModifierGroup[]
+
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id           BigInt         @id @default(autoincrement())
+  groupId      BigInt         @map("group_id")
+  name         String         // Sprite, Fajita, Extra cheese
+  priceDelta   Int            @default(0) @map("price_delta")
+  linkedItemId BigInt?        @map("linked_item_id")
+  isAvailable  Boolean        @default(true) @map("is_available")
+  sortOrder    Int            @default(0) @map("sort_order")
+
+  group        ModifierGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  linkedItem   MenuItem?      @relation("LinkedMenuItem", fields: [linkedItemId], references: [id])
+
+  @@map("modifier_options")
+}
+
+model ItemModifierGroup {
+  menuItemId BigInt        @map("menu_item_id")
+  groupId    BigInt        @map("group_id")
+  sortOrder  Int           @default(0) @map("sort_order")
+
+  menuItem   MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  group      ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([menuItemId, groupId])
+  @@map("item_modifier_groups")
+}
+
+// ===== Customers and delivery =====
+model Customer {
+  id           BigInt            @id @default(autoincrement())
+  phone        String            @unique // normalized 923001234567
+  name         String?
+  ordersCount  Int               @default(0) @map("orders_count")
+  totalSpent   Int               @default(0) @map("total_spent")
+  firstOrderAt DateTime?         @map("first_order_at") @db.Timestamptz
+  lastOrderAt  DateTime?         @map("last_order_at") @db.Timestamptz
+  notes        String?
+  isBlocked    Boolean           @default(false) @map("is_blocked")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  addresses    CustomerAddress[]
+  orders       Order[]
+
+  @@map("customers")
+}
+
+model DeliveryZone {
+  id         BigInt            @id @default(autoincrement())
+  name       String            // e.g. Satellite Town
+  fee        Int               @default(0)
+  minOrder   Int               @default(0) @map("min_order")
+  etaMinutes Int               @default(45) @map("eta_minutes")
+  isActive   Boolean           @default(true) @map("is_active")
+  sortOrder  Int               @default(0) @map("sort_order")
+
+  addresses  CustomerAddress[]
+  orders     Order[]
+
+  @@map("delivery_zones")
+}
+
+model CustomerAddress {
+  id         BigInt        @id @default(autoincrement())
+  customerId BigInt        @map("customer_id")
+  zoneId     BigInt?       @map("zone_id")
+  address    String
+  landmark   String?
+  lat        Decimal?      @db.Decimal(9, 6)
+  lng        Decimal?      @db.Decimal(9, 6)
+  lastUsedAt DateTime      @default(now()) @map("last_used_at") @db.Timestamptz
+
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  zone       DeliveryZone? @relation(fields: [zoneId], references: [id])
+
+  @@map("customer_addresses")
+}
+
+// ===== Orders and money =====
+model Shift {
+  id          BigInt     @id @default(autoincrement())
+  openedBy    BigInt     @map("opened_by")
+  openedAt    DateTime   @default(now()) @map("opened_at") @db.Timestamptz
+  openingCash Int        @map("opening_cash")
+  closedBy    BigInt?    @map("closed_by")
+  closedAt    DateTime?  @map("closed_at") @db.Timestamptz
+  countedCash Int?       @map("counted_cash")
+  expectedCash Int?      @map("expected_cash")
+  note        String?
+
+  opener      StaffUser  @relation("ShiftOpenedBy", fields: [openedBy], references: [id])
+  closer      StaffUser? @relation("ShiftClosedBy", fields: [closedBy], references: [id])
+  orders      Order[]
+  payments    Payment[]
+
+  @@map("shifts")
+}
+
+model DailyCounter {
+  businessDay DateTime @id @map("business_day") @db.Date
+  lastNo      Int      @default(0) @map("last_no")
+
+  @@map("daily_counters")
+}
+
+model Order {
+  id             BigInt          @id @default(autoincrement())
+  orderNo        String          @unique @map("order_no") // RP-261028-042
+  businessDay    DateTime        @map("business_day") @db.Date
+  channel        OrderChannel
+  type           OrderType
+  status         OrderStatus     @default(NEW)
+  customerId     BigInt?         @map("customer_id")
+  customerName   String?         @map("customer_name")
+  customerPhone  String?         @map("customer_phone")
+  zoneId         BigInt?         @map("zone_id")
+  address        String?
+  landmark       String?
+  lat            Decimal?        @db.Decimal(9, 6)
+  lng            Decimal?        @db.Decimal(9, 6)
+  tableLabel     String?         @map("table_label")
+  subtotal       Int
+  discount       Int             @default(0)
+  discountReason String?         @map("discount_reason")
+  deliveryFee    Int             @default(0) @map("delivery_fee")
+  tax            Int             @default(0)
+  total          Int
+  paymentStatus  PaymentStatus   @default(UNPAID) @map("payment_status")
+  customerNote   String?         @map("customer_note")
+  etaMinutes     Int?            @map("eta_minutes")
+  createdBy      BigInt?         @map("created_by")
+  shiftId        BigInt?         @map("shift_id")
+  idempotencyKey String?         @unique @map("idempotency_key")
+  cancelReason   String?         @map("cancel_reason")
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  confirmedAt    DateTime?       @map("confirmed_at") @db.Timestamptz
+  readyAt        DateTime?       @map("ready_at") @db.Timestamptz
+  completedAt    DateTime?       @map("completed_at") @db.Timestamptz
+  cancelledAt    DateTime?       @map("cancelled_at") @db.Timestamptz
+
+  customer       Customer?       @relation(fields: [customerId], references: [id])
+  zone           DeliveryZone?   @relation(fields: [zoneId], references: [id])
+  creator        StaffUser?      @relation("OrderCreatedBy", fields: [createdBy], references: [id])
+  shift          Shift?          @relation(fields: [shiftId], references: [id])
+  items          OrderItem[]
+  statusLogs     OrderStatusLog[]
+  payments       Payment[]
+  whatsAppMessages WhatsAppMessage[]
+
+  @@index([businessDay], name: "orders_day_idx")
+  @@index([customerId], name: "orders_customer_idx")
+  @@map("orders")
+}
+
+model OrderItem {
+  id           BigInt       @id @default(autoincrement())
+  orderId      BigInt       @map("order_id")
+  menuItemId   BigInt?      @map("menu_item_id")
+  variantId    BigInt?      @map("variant_id")
+  itemName     String       @map("item_name")
+  variantName  String?      @map("variant_name")
+  unitPrice    Int          @map("unit_price")
+  quantity     Int
+  modifiers    Json         @default("[]")
+  lineTotal    Int          @map("line_total")
+  note         String?
+
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem     MenuItem?    @relation(fields: [menuItemId], references: [id])
+  variant      ItemVariant? @relation(fields: [variantId], references: [id])
+
+  @@index([orderId], name: "order_items_order_idx")
+  @@map("order_items")
+}
+
+model OrderStatusLog {
+  id         BigInt      @id @default(autoincrement())
+  orderId    BigInt      @map("order_id")
+  fromStatus OrderStatus? @map("from_status")
+  toStatus   OrderStatus @map("to_status")
+  changedBy  BigInt?     @map("changed_by")
+  changedAt  DateTime    @default(now()) @map("changed_at") @db.Timestamptz
+
+  order      Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changer    StaffUser?  @relation(fields: [changedBy], references: [id])
+
+  @@map("order_status_log")
+}
+
+model Payment {
+  id          BigInt        @id @default(autoincrement())
+  orderId     BigInt        @map("order_id")
+  method      PaymentMethod
+  amount      Int
+  tendered    Int?
+  reference   String?
+  receivedBy  BigInt?       @map("received_by")
+  shiftId     BigInt?       @map("shift_id")
+  receivedAt  DateTime      @default(now()) @map("received_at") @db.Timestamptz
+
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receiver    StaffUser?    @relation(fields: [receivedBy], references: [id])
+  shift       Shift?        @relation(fields: [shiftId], references: [id])
+
+  @@map("payments")
+}
+
+// ===== System =====
+model Setting {
+  key       String    @id
+  value     Json
+  updatedBy BigInt?   @map("updated_by")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("settings")
+}
+
+model Banner {
+  id         BigInt    @id @default(autoincrement())
+  title      String
+  imageUrl   String    @map("image_url")
+  linkItemId BigInt?   @map("link_item_id")
+  startsAt   DateTime? @map("starts_at") @db.Timestamptz
+  endsAt     DateTime? @map("ends_at") @db.Timestamptz
+  sortOrder  Int       @default(0) @map("sort_order")
+  isActive   Boolean   @default(true) @map("is_active")
+
+  linkItem   MenuItem? @relation(fields: [linkItemId], references: [id])
+
+  @@map("banners")
+}
+
+model AuditLog {
+  id        BigInt    @id @default(autoincrement())
+  staffId   BigInt?   @map("staff_id")
+  action    String
+  entity    String
+  entityId  BigInt?   @map("entity_id")
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  staff     StaffUser? @relation(fields: [staffId], references: [id])
+
+  @@map("audit_log")
+}
+
+model WhatsAppMessage {
+  id            BigInt    @id @default(autoincrement())
+  orderId       BigInt?   @map("order_id")
+  toPhone       String    @map("to_phone")
+  template      String
+  status        String    @default("queued")
+  providerMsgId String?   @map("provider_msg_id")
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  order         Order?    @relation(fields: [orderId], references: [id])
+
+  @@map("whatsapp_messages")
+}

@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rimjhim_web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://rimjhim_user:rimjhim_secure_pass@db:5432/rimjhim_pizzeria?schema=public
+      - NEXT_PUBLIC_STORE_PHONE=03086547672
+      - NEXT_PUBLIC_STORE_NAME=Rimjhim Pizzeria
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: rimjhim_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: rimjhim_user
+      POSTGRES_PASSWORD: rimjhim_secure_pass
+      POSTGRES_DB: rimjhim_pizzeria
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rimjhim_user -d rimjhim_pizzeria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nightly database backup to keep 30 days of pg_dump backups
+  db_backup:
+    image: postgres:16-alpine
+    container_name: rimjhim_backup
+    restart: always
+    depends_on:
+      - db
+    environment:
+      - PGPASSWORD=rimjhim_secure_pass
+    volumes:
+      - ./backups:/backups
+    entrypoint: |
+      sh -c '
+      while true; do
+        echo "Creating nightly backup..."
+        pg_dump -h db -U rimjhim_user -d rimjhim_pizzeria -F c -b -v -f /backups/rimjhim_$$(date +%Y%m%d_%H%M%S).dump
+        # keep last 30 days
+        find /backups -type f -name "*.dump" -mtime +30 -exec rm {} \;
+        sleep 86400
+      done'
+
+volumes:
+  postgres_data:
