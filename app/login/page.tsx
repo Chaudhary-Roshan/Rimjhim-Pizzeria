@@ -343,6 +343,11 @@ function LoginForm() {
           <span>Back to Customer Website</span>
         </Link>
       </div>
+
+      {/* Developer Attribution */}
+      <div className="mt-4 text-[11px] text-stone-500 text-center">
+        This website is developed by <strong className="text-stone-400 font-semibold">Muhammad Roshan Ashraf</strong> (0303-7357002)
+      </div>
     </div>
   );
 }

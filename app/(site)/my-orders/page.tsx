@@ -158,6 +158,22 @@ export default function MyOrdersPage() {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="bg-charcoal text-stone-400 py-8 px-4 sm:px-6 mt-16 border-t border-stone-800 text-center text-xs space-y-2">
+        <div>
+          © {new Date().getFullYear()} Rimjhim Pizzeria. All rights reserved. Commercial Area, Satellite Town, Bahawalpur.
+        </div>
+        <div className="text-[11px] text-stone-400">
+          This website is developed by <strong className="text-amber font-semibold">Muhammad Roshan Ashraf</strong> •{" "}
+          <a
+            href="tel:03037357002"
+            className="text-stone-300 hover:text-amber font-mono font-medium underline underline-offset-2 transition-colors"
+          >
+            0303-7357002
+          </a>
+        </div>
+      </footer>
     </div>
   );
 }
