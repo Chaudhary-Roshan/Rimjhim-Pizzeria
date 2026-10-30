@@ -87,14 +87,7 @@ export function Navbar() {
         </nav>
 
         {/* Right CTA / Cart */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            href="/login"
-            className="hidden lg:inline-flex text-xs text-stone-400 hover:text-white px-3 py-1.5 rounded-xl border border-stone-800 hover:border-stone-700 transition-colors"
-          >
-            Staff Sign In
-          </Link>
-
+        <div className="flex items-center gap-3">
           <button
             onClick={() => toggleCart(true)}
             className="relative flex items-center gap-2 bg-rimjhimRed hover:bg-rimjhimRed-dark text-white px-4 py-2 rounded-full font-medium text-sm transition-all shadow-md active:scale-95"

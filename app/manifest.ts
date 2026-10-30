@@ -53,12 +53,13 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
       {
-        name: "Staff Register",
-        short_name: "POS",
-        description: "Counter and kitchen register",
-        url: "/owner/pos",
+        name: "Special Deals",
+        short_name: "Deals",
+        description: "View discount bundles and family deals",
+        url: "/menu?cat=deals",
         icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }],
       },
     ],
   };
 }
+

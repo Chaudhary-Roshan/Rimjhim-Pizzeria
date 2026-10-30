@@ -21,7 +21,6 @@ import {
   ShieldCheck,
   Bike,
   UtensilsCrossed,
-  Lock,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -284,7 +283,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <footer className="bg-charcoal text-stone-300 py-12 px-4 sm:px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="space-y-3">
             <div className="font-heading text-2xl uppercase text-white tracking-wider">
               Rimjhim <span className="text-amber">Pizzeria</span>
@@ -305,7 +304,7 @@ export default function HomePage() {
           </div>
 
           <div>
-            <h4 className="font-heading text-lg uppercase text-white mb-3">Location</h4>
+            <h4 className="font-heading text-lg uppercase text-white mb-3">Location & Orders</h4>
             <div className="text-xs space-y-1.5 text-stone-400">
               <p className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-amber" /> Commercial Area, Satellite Town, Bahawalpur
@@ -313,18 +312,6 @@ export default function HomePage() {
               <p className="flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5 text-amber" /> 0308-6547672 / 0315-7074274
               </p>
-            </div>
-          </div>
-
-          <div>
-            <h4 className="font-heading text-lg uppercase text-white mb-3">Staff</h4>
-            <div className="space-y-2 text-xs">
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-1.5 text-stone-400 hover:text-amber transition-colors"
-              >
-                <Lock className="w-3.5 h-3.5" /> Staff Portal Sign In
-              </Link>
             </div>
           </div>
         </div>

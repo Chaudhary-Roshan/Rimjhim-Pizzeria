@@ -78,7 +78,7 @@ export function createSessionToken(session: StaffSession): string {
   };
   const json = JSON.stringify(payload);
   const base64 = safeEncode(json);
-  
+
   // Create signature
   let hash = 0;
   for (let i = 0; i < base64.length; i++) {
@@ -93,7 +93,7 @@ export function verifySessionToken(token: string): StaffSession | null {
   try {
     if (!token || !token.includes(".")) return null;
     const [base64, sig] = token.split(".");
-    
+
     // Check signature
     let hash = 0;
     for (let i = 0; i < base64.length; i++) {
