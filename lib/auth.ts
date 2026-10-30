@@ -18,24 +18,6 @@ export const STAFF_ACCOUNTS: (StaffSession & { pin: string; password?: string; i
     password: "admin123",
     isActive: true,
   },
-  {
-    id: "staff-2",
-    name: "Owner / Counter",
-    phone: "03086547672",
-    role: "OWNER",
-    pin: "9999",
-    password: "owner123",
-    isActive: true,
-  },
-  {
-    id: "staff-3",
-    name: "Counter Cashier",
-    phone: "03000000001",
-    role: "CASHIER",
-    pin: "0000",
-    password: "cashier123",
-    isActive: true,
-  },
 ];
 
 export const AUTH_COOKIE_NAME = "rimjhim_staff_session";

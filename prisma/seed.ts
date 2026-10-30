@@ -23,10 +23,14 @@ async function main() {
   });
   console.log("✓ Settings seeded");
 
-  // 2. Default Staff accounts
+  // 2. Default Staff accounts (Admin Only)
   await prisma.staffUser.upsert({
     where: { phone: "03001234567" },
-    update: {},
+    update: {
+      role: "ADMIN",
+      isActive: true,
+      posPinHash: "1234",
+    },
     create: {
       name: "Hamza Afzal",
       phone: "03001234567",
@@ -34,22 +38,10 @@ async function main() {
       passwordHash: "demo_hash_argon2",
       posPinHash: "1234",
       role: "ADMIN",
+      isActive: true,
     },
   });
-
-  await prisma.staffUser.upsert({
-    where: { phone: "03086547672" },
-    update: {},
-    create: {
-      name: "Owner / Counter",
-      phone: "03086547672",
-      email: "owner@rimjhimpizzeria.com",
-      passwordHash: "demo_hash_argon2",
-      posPinHash: "9999",
-      role: "OWNER",
-    },
-  });
-  console.log("✓ Staff accounts seeded");
+  console.log("✓ Admin staff account seeded");
 
   // 3. Delivery Zones
   for (const [index, zone] of DELIVERY_ZONES_DATA.entries()) {
