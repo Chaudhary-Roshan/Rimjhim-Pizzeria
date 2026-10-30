@@ -15,6 +15,7 @@ import {
   ExternalLink,
   LogOut,
   User,
+  ShieldCheck,
 } from "lucide-react";
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
@@ -81,6 +82,16 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
     { href: "/owner/shifts", label: "Cash Shifts", icon: Wallet },
   ];
 
+  const filteredNavLinks = navLinks.filter((link) => {
+    if (staff?.role === "KITCHEN") {
+      return link.href === "/owner/orders";
+    }
+    if (staff?.role === "CASHIER") {
+      return link.href !== "/owner/reports";
+    }
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-stone-900 text-stone-100 flex flex-col font-sans">
       {/* Top Header */}
@@ -137,6 +148,18 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
             <ExternalLink className="w-3 h-3 text-stone-400" />
           </Link>
 
+          {/* Admin Executive Switcher (Only visible to Admin & Owner) */}
+          {(staff?.role === "ADMIN" || staff?.role === "OWNER") && (
+            <Link
+              href="/admin"
+              className="text-xs bg-rimjhimRed/20 hover:bg-rimjhimRed/30 text-rimjhimRed border border-rimjhimRed/40 font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 transition-colors"
+              title="Open Executive Admin Panel"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-rimjhimRed" />
+              <span className="hidden sm:inline">Admin Panel</span>
+            </Link>
+          )}
+
           {/* Sign Out */}
           <button
             onClick={handleLogout}
@@ -151,7 +174,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
 
       {/* Navigation Bar */}
       <nav className="bg-charcoal border-b border-stone-800 px-4 sm:px-6 flex items-center gap-1 overflow-x-auto scrollbar-none">
-        {navLinks.map((link) => {
+        {filteredNavLinks.map((link) => {
           const Icon = link.icon;
           const isActive = pathname.startsWith(link.href);
           return (

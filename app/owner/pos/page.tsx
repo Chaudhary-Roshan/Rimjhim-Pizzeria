@@ -43,6 +43,9 @@ export default function PosRegisterPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("pizzas");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeItemModal, setActiveItemModal] = useState<MenuItemSeed | null>(null);
+  const [modalVariantIdx, setModalVariantIdx] = useState<number>(0);
+  const [modalModifiers, setModalModifiers] = useState<{ group: string; option: string; priceDelta: number }[]>([]);
+  const [modalQty, setModalQty] = useState<number>(1);
 
   useEffect(() => {
     async function loadPosMenu() {
@@ -114,7 +117,8 @@ export default function PosRegisterPage() {
   const handleAddItem = (
     item: MenuItemSeed,
     variantIndex: number = 0,
-    chosenModifiers: { group: string; option: string; priceDelta: number }[] = []
+    chosenModifiers: { group: string; option: string; priceDelta: number }[] = [],
+    qty: number = 1
   ) => {
     const variant = item.variants[variantIndex] || item.variants[0];
     const modPrice = chosenModifiers.reduce((sum, m) => sum + m.priceDelta, 0);
@@ -126,7 +130,7 @@ export default function PosRegisterPage() {
     setTicketItems((prev) => {
       const existing = prev.find((it) => it.id === lineId);
       if (existing) {
-        return prev.map((it) => (it.id === lineId ? { ...it, quantity: it.quantity + 1 } : it));
+        return prev.map((it) => (it.id === lineId ? { ...it, quantity: it.quantity + qty } : it));
       }
       return [
         ...prev,
@@ -136,13 +140,48 @@ export default function PosRegisterPage() {
           name: item.name,
           variantName: variant.name,
           unitPrice,
-          quantity: 1,
+          quantity: qty,
           modifiers: chosenModifiers,
         },
       ];
     });
 
     setActiveItemModal(null);
+  };
+
+  const openItemModal = (item: MenuItemSeed) => {
+    setModalVariantIdx(0);
+    setModalQty(1);
+
+    const initialMods: { group: string; option: string; priceDelta: number }[] = [];
+    (item.modifierGroupNames || []).forEach((groupName) => {
+      const group = MODIFIER_GROUPS_DATA.find((g) => g.name.toLowerCase() === groupName.toLowerCase());
+      if (group && group.minSelect === 1 && group.options.length > 0) {
+        initialMods.push({
+          group: group.name,
+          option: group.options[0].name,
+          priceDelta: group.options[0].priceDelta,
+        });
+      }
+    });
+    setModalModifiers(initialMods);
+    setActiveItemModal(item);
+  };
+
+  const toggleModifierOption = (groupName: string, optionName: string, priceDelta: number, isSingleSelect: boolean) => {
+    setModalModifiers((prev) => {
+      if (isSingleSelect) {
+        const filtered = prev.filter((m) => m.group !== groupName);
+        return [...filtered, { group: groupName, option: optionName, priceDelta }];
+      } else {
+        const exists = prev.find((m) => m.group === groupName && m.option === optionName);
+        if (exists) {
+          return prev.filter((m) => !(m.group === groupName && m.option === optionName));
+        } else {
+          return [...prev, { group: groupName, option: optionName, priceDelta }];
+        }
+      }
+    });
   };
 
   const updateQty = (id: string, delta: number) => {
@@ -265,10 +304,14 @@ export default function PosRegisterPage() {
                 disabled={isSoldOut}
                 onClick={() => {
                   if (isSoldOut) return;
-                  if (hasMultipleSizes || hasModifiers) {
-                    setActiveItemModal(item);
+                  const hasMultipleSizes = item.variants.length > 1;
+                  const hasModifiers = (item.modifierGroupNames || []).length > 0;
+                  const hasDealItems = (item.dealComponents || []).length > 0;
+
+                  if (hasMultipleSizes || hasModifiers || hasDealItems) {
+                    openItemModal(item);
                   } else {
-                    handleAddItem(item, 0, []);
+                    handleAddItem(item, 0, [], 1);
                   }
                 }}
                 className={`border rounded-xl p-2.5 text-left flex flex-col justify-between transition-all group ${
@@ -536,40 +579,199 @@ export default function PosRegisterPage() {
 
       {/* POS Item Option Modal */}
       {activeItemModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-charcoal border border-stone-700 rounded-2xl max-w-md w-full p-5 text-white space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-700 pb-2">
-              <h3 className="font-heading text-xl uppercase text-white">
-                {activeItemModal.name}
-              </h3>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-charcoal border border-stone-700 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden text-white shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-stone-800 flex items-center justify-between shrink-0 bg-stone-900/90">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber/20 border border-amber/30 text-amber flex items-center justify-center font-heading text-lg">
+                  🍕
+                </div>
+                <div>
+                  <h3 className="font-heading text-lg sm:text-xl uppercase text-white leading-tight">
+                    {activeItemModal.name}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-stone-800 text-stone-300 border border-stone-700">
+                      {activeItemModal.categorySlug}
+                    </span>
+                    {activeItemModal.kind === "DEAL" && (
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-rimjhimRed/20 text-rimjhimRed border border-rimjhimRed/30">
+                        Deal Bundle
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
               <button
                 onClick={() => setActiveItemModal(null)}
-                className="text-stone-400 hover:text-white"
+                className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Sizes */}
-            {activeItemModal.variants.length > 1 && (
-              <div>
-                <label className="text-xs font-semibold text-stone-400 uppercase block mb-1.5">
-                  Select Size:
-                </label>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  {activeItemModal.variants.map((v, i) => (
-                    <button
-                      key={v.name}
-                      onClick={() => handleAddItem(activeItemModal, i, [])}
-                      className="bg-stone-800 hover:bg-amber hover:text-charcoal border border-stone-700 p-2.5 rounded-xl text-center font-bold transition-colors"
-                    >
-                      <div>{v.name}</div>
-                      <div className="text-[11px] mt-0.5">{formatRupees(v.price)}</div>
-                    </button>
-                  ))}
+            {/* Modal Body (Scrollable) */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Deal bundle ingredients preview */}
+              {activeItemModal.dealComponents && activeItemModal.dealComponents.length > 0 && (
+                <div className="bg-stone-900/90 border border-amber/30 p-3 rounded-2xl space-y-1.5">
+                  <span className="text-[11px] font-heading uppercase text-amber tracking-wider font-bold block">
+                    🎁 Bundle Includes:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs text-stone-300">
+                    {activeItemModal.dealComponents.map((comp, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 bg-stone-800/60 px-2.5 py-1.5 rounded-xl border border-stone-700/50">
+                        <Check className="w-3.5 h-3.5 text-freshLime shrink-0" />
+                        <span className="font-medium text-white">{comp.label}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
+
+              {/* Sizes / Portion Selection */}
+              <div>
+                <label className="text-xs font-heading uppercase tracking-wider text-stone-300 block mb-2 font-bold">
+                  {activeItemModal.variants.length > 1 ? "1. Choose Size / Variant:" : "Portion / Base Price:"}
+                </label>
+                {activeItemModal.variants.length > 1 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {activeItemModal.variants.map((v, i) => {
+                      const isSelected = modalVariantIdx === i;
+                      return (
+                        <button
+                          key={v.name}
+                          type="button"
+                          onClick={() => setModalVariantIdx(i)}
+                          className={`p-3 rounded-2xl border text-left transition-all ${
+                            isSelected
+                              ? "bg-amber text-charcoal border-amber shadow-md font-bold scale-[1.02]"
+                              : "bg-stone-900 hover:bg-stone-800 text-stone-300 border-stone-800 hover:border-stone-700"
+                          }`}
+                        >
+                          <div className="font-heading uppercase text-sm leading-tight">{v.name}</div>
+                          <div className={`text-xs mt-1 font-mono font-bold ${isSelected ? "text-charcoal" : "text-amber"}`}>
+                            {formatRupees(v.price)}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-stone-900 border border-stone-800 p-3 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <span className="font-heading uppercase text-sm text-white font-bold">
+                        {activeItemModal.variants[0]?.name || "Standard Single"}
+                      </span>
+                      {activeItemModal.description && (
+                        <p className="text-[11px] text-stone-400 mt-0.5 line-clamp-1">{activeItemModal.description}</p>
+                      )}
+                    </div>
+                    <span className="font-heading text-amber text-base font-bold font-mono">
+                      {formatRupees(activeItemModal.variants[0]?.price || 0)}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Modifier Groups (Choose Drink, Choose Flavour, Add Extras) */}
+              {(activeItemModal.modifierGroupNames || []).map((groupName) => {
+                const group = MODIFIER_GROUPS_DATA.find((g) => g.name.toLowerCase() === groupName.toLowerCase());
+                if (!group) return null;
+                const isSingleSelect = group.maxSelect === 1;
+
+                return (
+                  <div key={group.name} className="space-y-2 pt-1 border-t border-stone-800/80">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-heading uppercase tracking-wider text-stone-300 font-bold">
+                        {group.name}
+                      </label>
+                      <span className="text-[10px] text-stone-400 bg-stone-900 px-2 py-0.5 rounded-full border border-stone-800">
+                        {isSingleSelect ? "Select 1" : `Up to ${group.maxSelect}`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {group.options.map((opt) => {
+                        const isChosen = modalModifiers.some(
+                          (m) => m.group === group.name && m.option === opt.name
+                        );
+
+                        return (
+                          <button
+                            key={opt.name}
+                            type="button"
+                            onClick={() =>
+                              toggleModifierOption(group.name, opt.name, opt.priceDelta, isSingleSelect)
+                            }
+                            className={`px-3 py-2 rounded-xl text-xs font-medium border text-left flex items-center justify-between transition-all ${
+                              isChosen
+                                ? "bg-amber/20 border-amber text-amber font-bold"
+                                : "bg-stone-900 hover:bg-stone-800 border-stone-800 text-stone-300"
+                            }`}
+                          >
+                            <span className="truncate pr-1">{opt.name}</span>
+                            {opt.priceDelta > 0 && (
+                              <span className="text-[10px] text-freshLime font-mono shrink-0">
+                                +{opt.priceDelta}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer: Qty + Total + Add Button */}
+            <div className="p-4 sm:p-5 border-t border-stone-800 bg-stone-900 flex items-center gap-3 shrink-0">
+              {/* Quantity counter */}
+              <div className="flex items-center bg-stone-800 border border-stone-700 rounded-xl p-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModalQty((q) => Math.max(1, q - 1))}
+                  className="w-8 h-8 rounded-lg bg-stone-700 hover:bg-stone-600 flex items-center justify-center text-white transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-8 text-center font-heading text-sm font-bold text-white">
+                  {modalQty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setModalQty((q) => q + 1)}
+                  className="w-8 h-8 rounded-lg bg-stone-700 hover:bg-stone-600 flex items-center justify-center text-white transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Add to Ticket Button */}
+              {(() => {
+                const variantPrice =
+                  activeItemModal.variants[modalVariantIdx]?.price ||
+                  activeItemModal.variants[0]?.price ||
+                  0;
+                const modTotal = modalModifiers.reduce((sum, m) => sum + m.priceDelta, 0);
+                const itemTotal = (variantPrice + modTotal) * modalQty;
+
+                return (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAddItem(activeItemModal, modalVariantIdx, modalModifiers, modalQty);
+                    }}
+                    className="flex-1 py-3 px-4 rounded-xl bg-amber hover:bg-amber-dark text-charcoal font-heading uppercase text-sm font-bold flex items-center justify-between shadow-lg transition-all active:scale-98"
+                  >
+                    <span>Add to Ticket</span>
+                    <span className="font-mono text-base">{formatRupees(itemTotal)}</span>
+                  </button>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

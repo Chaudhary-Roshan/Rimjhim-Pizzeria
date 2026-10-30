@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mockDb } from "@/lib/mock-db";
+import { AUTH_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const session = token ? verifySessionToken(token) : null;
+  if (!session || (session.role !== "ADMIN" && session.role !== "OWNER")) {
+    return NextResponse.json({ success: false, message: "Unauthorized. Admin access required." }, { status: 403 });
+  }
+
   const staff = mockDb.getStaffUsers();
   return NextResponse.json({ success: true, staff });
 }
 
 export async function POST(request: NextRequest) {
   try {
+    const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+    const session = token ? verifySessionToken(token) : null;
+    if (!session || (session.role !== "ADMIN" && session.role !== "OWNER")) {
+      return NextResponse.json({ success: false, message: "Unauthorized. Admin access required." }, { status: 403 });
+    }
+
     const body = await request.json();
     const { action, id, pin, name, phone, role, password } = body;
 

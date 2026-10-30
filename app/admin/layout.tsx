@@ -23,6 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [staff, setStaff] = useState<{ name: string; role: string } | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
     async function loadUser() {
@@ -30,14 +31,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const res = await fetch("/api/auth/me");
         const data = await res.json();
         if (data.authenticated) {
+          if (data.user.role !== "ADMIN" && data.user.role !== "OWNER") {
+            // Not allowed in executive admin panel - redirect to POS or Orders
+            router.replace(data.user.role === "KITCHEN" ? "/owner/orders" : "/owner/pos");
+            return;
+          }
           setStaff(data.user);
+        } else {
+          router.replace("/login");
+          return;
         }
       } catch {
         // ignore
+      } finally {
+        setCheckingAuth(false);
       }
     }
     loadUser();
-  }, []);
+  }, [router]);
 
   async function handleLogout() {
     try {
@@ -57,6 +68,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/zones", label: "Delivery Areas", icon: MapPin },
     { href: "/admin/settings", label: "Store Settings", icon: Settings },
   ];
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-stone-950 text-stone-100 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-10 h-10 border-2 border-amber border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="text-xs uppercase tracking-widest text-stone-400 font-semibold">
+            Verifying Admin Access...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!staff || (staff.role !== "ADMIN" && staff.role !== "OWNER")) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans selection:bg-amber selection:text-charcoal">
