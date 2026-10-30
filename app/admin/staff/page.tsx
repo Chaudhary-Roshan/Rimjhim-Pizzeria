@@ -281,7 +281,7 @@ export default function AdminStaffPage() {
             <strong>How PIN Sign-in works:</strong> Staff can log in instantly on POS tablets, counter registers, and kitchen screens using their assigned <strong>4-digit PIN</strong> on the touch numpad without typing passwords.
           </p>
           <p className="text-stone-400">
-            <strong>Default emergency PINs:</strong> Admin (<code className="text-amber">1234</code>), Owner (<code className="text-amber">9999</code>), Cashier (<code className="text-amber">0000</code>), Kitchen Display (<code className="text-amber">1111</code>). You can update these anytime below.
+            <strong>Security policy:</strong> PINs must be confidential and unique to each staff member. You can create or modify credentials anytime below.
           </p>
         </div>
       </div>

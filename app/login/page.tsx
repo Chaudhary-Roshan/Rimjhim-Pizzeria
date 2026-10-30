@@ -285,7 +285,7 @@ function LoginForm() {
               </label>
               <input
                 type="text"
-                placeholder="03001234567"
+                placeholder="03XXXXXXXXX"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -324,10 +324,10 @@ function LoginForm() {
           </form>
         )}
 
-        {/* Default Access Hints */}
+        {/* Secure Access Notice */}
         <div className="mt-6 pt-5 border-t border-stone-800 text-center">
           <p className="text-[11px] text-stone-500 font-medium">
-            Authorized staff only. Default PIN: <span className="text-amber font-mono font-semibold">1234</span> (Admin) or <span className="text-amber font-mono font-semibold">9999</span> (Owner)
+            Authorized staff only. For security, sign-in access is restricted to verified credentials.
           </p>
         </div>
       </div>

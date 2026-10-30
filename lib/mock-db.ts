@@ -129,11 +129,11 @@ if (!globalStore.__RIMJHIM_STAFF) {
   globalStore.__RIMJHIM_STAFF = [
     {
       id: "staff-1",
-      name: "Hamza Afzal",
-      phone: "03001234567",
+      name: process.env.ADMIN_NAME || "Hamza Afzal",
+      phone: process.env.ADMIN_PHONE || "03001234567",
       role: "ADMIN",
       pin: process.env.OWNER_POS_PIN || "1234",
-      password: "admin123",
+      password: process.env.ADMIN_PASSWORD || "admin123",
       isActive: true,
       createdAt: "2026-01-01T00:00:00.000Z",
     },
