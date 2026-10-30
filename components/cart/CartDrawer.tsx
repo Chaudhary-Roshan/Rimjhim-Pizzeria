@@ -170,6 +170,19 @@ export function CartDrawer() {
                           • {mod.option} {mod.priceDelta > 0 && `(+${formatRupees(mod.priceDelta)})`}
                         </div>
                       ))}
+                      {item.dealComponents && item.dealComponents.length > 0 && (
+                        <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200/80 p-1.5 rounded-lg mt-1.5 space-y-0.5">
+                          <span className="font-bold block text-[10px] uppercase tracking-wider text-amber-900">🎁 Bundle Includes:</span>
+                          {item.dealComponents.map((c, idx) => (
+                            <div key={idx} className="font-medium">• {c}</div>
+                          ))}
+                        </div>
+                      )}
+                      {!item.dealComponents && item.note && (
+                        <div className="text-[11px] text-stone-600 italic mt-1">
+                          Note: {item.note}
+                        </div>
+                      )}
                     </div>
 
                     {/* Quantity Stepper */}

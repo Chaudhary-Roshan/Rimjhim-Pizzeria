@@ -15,6 +15,7 @@ export interface CartItem {
   quantity: number;
   imageUrl?: string;
   modifiers: CartModifier[];
+  dealComponents?: string[];
   note?: string;
 }
 

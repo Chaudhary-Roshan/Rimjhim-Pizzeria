@@ -36,6 +36,8 @@ interface PosLineItem {
   unitPrice: number;
   quantity: number;
   modifiers: { group: string; option: string; priceDelta: number }[];
+  dealComponents?: string[];
+  description?: string;
 }
 
 export default function PosRegisterPage() {
@@ -76,6 +78,8 @@ export default function PosRegisterPage() {
 
   // Success modal & print
   const [lastOrder, setLastOrder] = useState<OrderRecord | null>(null);
+  const [lastOrderTendered, setLastOrderTendered] = useState<number>(0);
+  const [lastOrderChange, setLastOrderChange] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter menu items for POS grid
@@ -124,8 +128,13 @@ export default function PosRegisterPage() {
     const modPrice = chosenModifiers.reduce((sum, m) => sum + m.priceDelta, 0);
     const unitPrice = variant.price + modPrice;
 
-    const modKey = chosenModifiers.map((m) => m.option).sort().join("|");
+    const modKey = chosenModifiers.map((m) => `${m.group}:${m.option}`).sort().join("|");
     const lineId = `${item.id}-${variant.name}-${modKey}`;
+
+    const dealComponents =
+      item.dealComponents?.map(
+        (c) => `${c.quantity > 1 ? c.quantity + "x " : ""}${c.label}`
+      ) || [];
 
     setTicketItems((prev) => {
       const existing = prev.find((it) => it.id === lineId);
@@ -142,6 +151,8 @@ export default function PosRegisterPage() {
           unitPrice,
           quantity: qty,
           modifiers: chosenModifiers,
+          dealComponents,
+          description: item.description,
         },
       ];
     });
@@ -217,6 +228,11 @@ export default function PosRegisterPage() {
             unitPrice: it.unitPrice,
             quantity: it.quantity,
             modifiers: it.modifiers,
+            dealComponents: it.dealComponents,
+            note:
+              it.dealComponents && it.dealComponents.length > 0
+                ? `Bundle: ${it.dealComponents.join(" • ")}`
+                : undefined,
           })),
         }),
       });
@@ -224,6 +240,8 @@ export default function PosRegisterPage() {
       const data = await res.json();
       if (data.success) {
         setLastOrder(data.order);
+        setLastOrderTendered(paymentMethod === "CASH" ? (cashTendered || total) : total);
+        setLastOrderChange(paymentMethod === "CASH" ? Math.max(0, (cashTendered || total) - total) : 0);
         // Clear ticket
         setTicketItems([]);
         setTableOrToken("");
@@ -448,12 +466,29 @@ export default function PosRegisterPage() {
                   <div className="font-bold text-white leading-tight">
                     {item.name}
                   </div>
-                  {item.variantName && item.variantName !== "Regular" && (
-                    <div className="text-amber text-[11px]">Size: {item.variantName}</div>
+                  {item.variantName && item.variantName !== "Regular" && item.variantName !== "Standard" && (
+                    <div className="text-amber text-[11px] font-medium">Size: {item.variantName}</div>
                   )}
+
+                  {/* Deal Bundle Breakdown */}
+                  {item.dealComponents && item.dealComponents.length > 0 && (
+                    <div className="mt-1 bg-stone-850 border border-amber/30 rounded-lg p-1.5 space-y-0.5 text-[11px] text-amber-200">
+                      <span className="font-bold text-[10px] uppercase tracking-wider text-amber block">
+                        🎁 Bundle Includes:
+                      </span>
+                      {item.dealComponents.map((c, ci) => (
+                        <div key={ci} className="text-stone-300 font-medium">
+                          • {c}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Modifiers (Flavours, Drinks, Addons) */}
                   {item.modifiers.map((m, i) => (
-                    <div key={i} className="text-stone-400 text-[10px]">
-                      • {m.option}
+                    <div key={i} className="text-stone-400 text-[10px] mt-0.5">
+                      • {m.group ? `${m.group}: ` : ""}{m.option}
+                      {m.priceDelta > 0 && ` (+${formatRupees(m.priceDelta)})`}
                     </div>
                   ))}
 
@@ -776,39 +811,239 @@ export default function PosRegisterPage() {
         </div>
       )}
 
-      {/* Print Confirmation Modal */}
+      {/* Itemized 80mm Thermal Receipt Modal & Direct Print Container */}
       {lastOrder && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-charcoal border border-stone-700 rounded-3xl max-w-sm w-full p-6 text-white text-center space-y-4">
-            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto text-2xl">
-              ✓
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-charcoal border border-stone-700 rounded-3xl max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden text-white shadow-2xl">
+            {/* Header */}
+            <div className="p-4 border-b border-stone-800 flex items-center justify-between shrink-0 bg-stone-900/90">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-base">
+                  ✓
+                </div>
+                <div>
+                  <h3 className="font-heading text-lg uppercase text-white leading-tight">
+                    Order #{lastOrder.orderNo}
+                  </h3>
+                  <span className="text-[11px] text-stone-400">
+                    Billed: {lastOrder.paymentMethod} • {formatRupees(lastOrder.total)}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setLastOrder(null)}
+                className="w-8 h-8 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <div>
-              <h3 className="font-heading text-2xl uppercase">Order #{lastOrder.orderNo}</h3>
-              <p className="text-xs text-stone-400 mt-1">
-                Sale registered successfully ({lastOrder.paymentMethod} • {formatRupees(lastOrder.total)})
-              </p>
+
+            {/* Receipt Preview Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-stone-950/60">
+              <div
+                id="thermal-pos-receipt"
+                className="bg-white text-black p-4 rounded-xl font-mono text-xs space-y-3 shadow-inner"
+              >
+                {/* Store Header */}
+                <div className="text-center border-b border-dashed border-stone-400 pb-2.5">
+                  <div className="font-bold text-base tracking-wider uppercase">RIMJHIM PIZZERIA</div>
+                  <div className="text-[11px] text-stone-700">Commercial Area, Satellite Town, Bahawalpur</div>
+                  <div className="text-[11px] text-stone-700">Phone: 0308-6547672 / 0300-1234567</div>
+                  <div className="font-bold text-sm uppercase mt-2 bg-stone-100 py-0.5">
+                    *** SALE RECEIPT ***
+                  </div>
+                  <div className="font-bold text-base mt-1 text-black">
+                    ORDER #{lastOrder.orderNo}
+                  </div>
+                  <div className="text-[10px] text-stone-600">
+                    {new Date(lastOrder.createdAt).toLocaleDateString([], {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}{" "}
+                    - {new Date(lastOrder.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                </div>
+
+                {/* Meta details */}
+                <div className="text-[11px] space-y-0.5 border-b border-dashed border-stone-400 pb-2">
+                  <div className="flex justify-between">
+                    <span>Channel / Type:</span>
+                    <span className="font-bold">
+                      {lastOrder.channel} • {lastOrder.type}
+                    </span>
+                  </div>
+                  {lastOrder.tableLabel && (
+                    <div className="flex justify-between">
+                      <span>Table / Token:</span>
+                      <span className="font-bold">{lastOrder.tableLabel}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Customer:</span>
+                    <span className="font-bold">{lastOrder.customerName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Phone:</span>
+                    <span>{lastOrder.customerPhone}</span>
+                  </div>
+                  {lastOrder.address && (
+                    <div className="pt-0.5 text-[10px] text-stone-700">
+                      <span>Delivery: {lastOrder.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Itemized Order Line Items with Deal Details */}
+                <div className="space-y-2 border-b border-dashed border-stone-400 pb-2.5">
+                  <div className="font-bold uppercase text-[10px] text-stone-600 flex justify-between border-b border-stone-200 pb-1">
+                    <span>ITEM & DETAILS</span>
+                    <span>TOTAL</span>
+                  </div>
+
+                  {lastOrder.items.map((it, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="flex justify-between font-bold text-xs">
+                        <span>
+                          {it.quantity}x {it.name}{" "}
+                          {it.variantName && it.variantName !== "Regular" && it.variantName !== "Standard"
+                            ? `(${it.variantName})`
+                            : ""}
+                        </span>
+                        <span>{formatRupees(it.lineTotal)}</span>
+                      </div>
+
+                      {/* Deal Bundle Elements Breakdown */}
+                      {it.dealComponents && it.dealComponents.length > 0 && (
+                        <div className="pl-2.5 text-[10px] text-stone-800 bg-stone-50 border border-stone-200 rounded p-1 space-y-0.5">
+                          <span className="font-bold uppercase text-[9px] block text-stone-900">
+                            Includes:
+                          </span>
+                          {it.dealComponents.map((c, ci) => (
+                            <div key={ci}>  - {c}</div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* If note has details and no dealComponents */}
+                      {!it.dealComponents && it.note && (
+                        <div className="pl-2.5 text-[10px] text-stone-700 italic">
+                          {it.note}
+                        </div>
+                      )}
+
+                      {/* Selected Modifiers (Drink, Flavour, Extra) */}
+                      {it.modifiers && it.modifiers.length > 0 && (
+                        <div className="pl-2.5 text-[10px] text-stone-600 space-y-0.5">
+                          {it.modifiers.map((m, mi) => (
+                            <div key={mi}>
+                              • {m.group ? `${m.group}: ` : ""}{m.option}
+                              {m.priceDelta > 0 && ` (+${formatRupees(m.priceDelta)})`}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calculation & Tender Breakdown */}
+                <div className="space-y-1 border-b border-dashed border-stone-400 pb-2 text-[11px]">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>{formatRupees(lastOrder.subtotal)}</span>
+                  </div>
+                  {lastOrder.discount > 0 && (
+                    <div className="flex justify-between text-stone-700">
+                      <span>Discount:</span>
+                      <span>-{formatRupees(lastOrder.discount)}</span>
+                    </div>
+                  )}
+                  {lastOrder.deliveryFee > 0 && (
+                    <div className="flex justify-between">
+                      <span>Delivery Fee:</span>
+                      <span>+{formatRupees(lastOrder.deliveryFee)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-sm pt-1 border-t border-stone-300">
+                    <span>NET TOTAL:</span>
+                    <span>{formatRupees(lastOrder.total)}</span>
+                  </div>
+                  <div className="flex justify-between pt-1">
+                    <span>Paid Via:</span>
+                    <span className="font-bold uppercase">{lastOrder.paymentMethod}</span>
+                  </div>
+                  {lastOrder.paymentMethod === "CASH" && (
+                    <>
+                      <div className="flex justify-between text-[10px]">
+                        <span>Cash Tendered:</span>
+                        <span>{formatRupees(lastOrderTendered || lastOrder.total)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-[11px]">
+                        <span>Change Due:</span>
+                        <span>{formatRupees(lastOrderChange || 0)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Footer Notes */}
+                <div className="text-center pt-2 text-[10px] text-stone-600 space-y-1">
+                  <div>Thank you for choosing Rimjhim Pizzeria!</div>
+                  <div className="font-semibold text-black">Visit again soon!</div>
+                  <div className="text-[9px] text-stone-400">Rimjhim POS System v2.0</div>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-2">
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-stone-800 bg-stone-900 flex items-center gap-2 shrink-0">
               <button
                 onClick={() => {
                   window.print();
-                  setLastOrder(null);
                 }}
-                className="flex-1 bg-amber hover:bg-amber-dark text-charcoal font-heading uppercase text-sm py-2.5 rounded-xl font-bold flex items-center justify-center gap-1.5"
+                className="flex-1 py-3 bg-amber hover:bg-amber-dark text-charcoal font-heading uppercase text-sm font-bold rounded-xl flex items-center justify-center gap-2 shadow-lg transition-colors active:scale-98"
               >
-                <Printer className="w-4 h-4" /> Print Receipt
+                <Printer className="w-4 h-4" />
+                <span>Print 80mm Receipt</span>
               </button>
               <button
                 onClick={() => setLastOrder(null)}
-                className="px-4 py-2.5 bg-stone-800 hover:bg-stone-700 text-stone-300 font-heading uppercase text-sm rounded-xl"
+                className="px-5 py-3 bg-stone-800 hover:bg-stone-700 text-stone-300 font-heading uppercase text-sm font-bold rounded-xl transition-colors"
               >
-                Done
+                Next Sale
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Thermal Print CSS */}
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #thermal-pos-receipt,
+          #thermal-pos-receipt * {
+            visibility: visible !important;
+          }
+          #thermal-pos-receipt {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 !important;
+            padding: 8px !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            font-size: 11px !important;
+            line-height: 1.3 !important;
+            box-shadow: none !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -353,23 +353,40 @@ export default function OwnerLiveOrdersPage() {
                         {/* Items Snapshot */}
                         <div className="divide-y divide-stone-800/60 text-xs text-stone-300">
                           {order.items.map((item, idx) => (
-                            <div key={idx} className="py-1.5 flex justify-between">
-                              <div>
-                                <span className="font-bold text-white">
+                            <div key={idx} className="py-2 flex justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="font-bold text-white leading-tight">
                                   {item.quantity}x {item.name}
-                                </span>
-                                {item.variantName && item.variantName !== "Regular" && (
-                                  <span className="text-amber text-[11px] ml-1">
-                                    ({item.variantName})
-                                  </span>
+                                  {item.variantName && item.variantName !== "Regular" && item.variantName !== "Standard" && (
+                                    <span className="text-amber text-[11px] ml-1">
+                                      ({item.variantName})
+                                    </span>
+                                  )}
+                                </div>
+                                {item.dealComponents && item.dealComponents.length > 0 && (
+                                  <div className="mt-1 bg-stone-900 border border-amber/30 rounded p-1.5 text-[11px] text-amber-200 space-y-0.5">
+                                    <span className="font-bold text-[10px] text-amber uppercase block tracking-wider">
+                                      🎁 Bundle Includes:
+                                    </span>
+                                    {item.dealComponents.map((c, ci) => (
+                                      <div key={ci} className="text-stone-300 font-medium">
+                                        • {c}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {!item.dealComponents && item.note && (
+                                  <div className="text-[10px] text-stone-400 italic mt-0.5">
+                                    {item.note}
+                                  </div>
                                 )}
                                 {item.modifiers?.map((m, mi) => (
-                                  <div key={mi} className="text-stone-400 text-[10px]">
-                                    • {m.option}
+                                  <div key={mi} className="text-stone-400 text-[10px] mt-0.5">
+                                    • {m.group ? `${m.group}: ` : ""}{m.option}
                                   </div>
                                 ))}
                               </div>
-                              <span className="font-semibold text-stone-300">
+                              <span className="font-semibold text-stone-300 shrink-0">
                                 {formatRupees(item.lineTotal)}
                               </span>
                             </div>
@@ -525,11 +542,33 @@ export default function OwnerLiveOrdersPage() {
             {printingOrder.address && <div>Address: {printingOrder.address}</div>}
           </div>
 
-          <div className="py-2 border-b border-black space-y-1">
+          <div className="py-2 border-b border-black space-y-2">
             {printingOrder.items.map((it, i) => (
-              <div key={i} className="flex justify-between">
-                <span>{it.quantity}x {it.name} {it.variantName ? `(${it.variantName})` : ""}</span>
-                <span>{formatRupees(it.lineTotal)}</span>
+              <div key={i} className="space-y-0.5">
+                <div className="flex justify-between font-bold">
+                  <span>
+                    {it.quantity}x {it.name} {it.variantName && it.variantName !== "Regular" && it.variantName !== "Standard" ? `(${it.variantName})` : ""}
+                  </span>
+                  <span>{formatRupees(it.lineTotal)}</span>
+                </div>
+                {it.dealComponents && it.dealComponents.length > 0 && (
+                  <div className="pl-3 text-[10px] text-stone-700">
+                    <span className="font-bold uppercase text-[9px]">Includes:</span>
+                    {it.dealComponents.map((c, ci) => (
+                      <div key={ci}>  - {c}</div>
+                    ))}
+                  </div>
+                )}
+                {!it.dealComponents && it.note && (
+                  <div className="pl-3 text-[10px] text-stone-700 italic">
+                    {it.note}
+                  </div>
+                )}
+                {it.modifiers && it.modifiers.length > 0 && (
+                  <div className="pl-3 text-[10px] text-stone-600">
+                    {it.modifiers.map((m) => `${m.group}: ${m.option}`).join(" | ")}
+                  </div>
+                )}
               </div>
             ))}
           </div>

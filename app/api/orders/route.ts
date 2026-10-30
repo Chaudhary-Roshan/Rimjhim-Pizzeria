@@ -18,6 +18,7 @@ const OrderItemSchema = z.object({
       })
     )
     .default([]),
+  dealComponents: z.array(z.string()).optional(),
   note: z.string().optional(),
 });
 
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
         quantity: item.quantity,
         lineTotal,
         modifiers: item.modifiers,
+        dealComponents: item.dealComponents,
         note: item.note,
       };
     });

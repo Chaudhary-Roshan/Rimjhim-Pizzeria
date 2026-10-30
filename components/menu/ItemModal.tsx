@@ -108,6 +108,14 @@ function ItemModalDialog({ item, onClose }: ItemModalDialogProps) {
       }
     }
 
+    const dealComponents =
+      item.dealComponents?.map(
+        (c) => `${c.quantity > 1 ? c.quantity + "x " : ""}${c.label}`
+      ) || [];
+
+    const dealNote = dealComponents.length > 0 ? `Includes: ${dealComponents.join(" • ")}` : "";
+    const combinedNote = [dealNote, specialNote.trim()].filter(Boolean).join(" | ");
+
     addItem({
       menuItemId: item.id,
       name: item.name,
@@ -116,7 +124,8 @@ function ItemModalDialog({ item, onClose }: ItemModalDialogProps) {
       quantity,
       imageUrl: item.imageUrl,
       modifiers: flatModifiers,
-      note: specialNote.trim() || undefined,
+      dealComponents: dealComponents.length > 0 ? dealComponents : undefined,
+      note: combinedNote || undefined,
     });
 
     onClose();

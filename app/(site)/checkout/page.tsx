@@ -127,6 +127,7 @@ export default function CheckoutPage() {
             unitPrice: i.unitPrice,
             quantity: i.quantity,
             modifiers: i.modifiers || [],
+            dealComponents: i.dealComponents,
             note: i.note,
           })),
         }),

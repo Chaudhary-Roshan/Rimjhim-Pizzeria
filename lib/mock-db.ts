@@ -41,6 +41,7 @@ export interface OrderRecord {
     quantity: number;
     lineTotal: number;
     modifiers: { group: string; option: string; priceDelta: number }[];
+    dealComponents?: string[];
     note?: string;
   }[];
   isFirstOrder?: boolean;
@@ -69,8 +70,19 @@ export interface StaffRecord {
   createdAt: string;
 }
 
+export interface ShiftTransaction {
+  id: string;
+  shiftId: string;
+  type: "CASH_IN" | "SAFE_DROP" | "EXPENSE";
+  amount: number;
+  reason: string;
+  staffName: string;
+  createdAt: string;
+}
+
 export interface ShiftRecord {
   id: string;
+  shiftNo?: string;
   openedBy: string;
   openedAt: string;
   openingCash: number;
@@ -79,6 +91,25 @@ export interface ShiftRecord {
   countedCash?: number;
   expectedCash?: number;
   status: "OPEN" | "CLOSED";
+  notes?: string;
+  totalSales?: number;
+  cashSales?: number;
+  cardSales?: number;
+  jazzCashSales?: number;
+  easyPaisaSales?: number;
+  ordersCount?: number;
+  dineInOrdersCount?: number;
+  takeawayOrdersCount?: number;
+  deliveryOrdersCount?: number;
+  dineInSales?: number;
+  takeawaySales?: number;
+  deliverySales?: number;
+  discountsTotal?: number;
+  deliveryFeesTotal?: number;
+  cashInTotal?: number;
+  safeDropTotal?: number;
+  expensesTotal?: number;
+  transactions?: ShiftTransaction[];
 }
 
 // Global in-memory storage (persists across hot reloads in Next.js development)
@@ -86,6 +117,7 @@ const globalStore = global as unknown as {
   __RIMJHIM_ORDERS?: OrderRecord[];
   __RIMJHIM_CUSTOMERS?: Map<string, CustomerRecord>;
   __RIMJHIM_CURRENT_SHIFT?: ShiftRecord;
+  __RIMJHIM_SHIFT_HISTORY?: ShiftRecord[];
   __RIMJHIM_SETTINGS?: typeof STORE_SETTINGS;
   __RIMJHIM_ITEMS?: MenuItemSeed[];
   __RIMJHIM_ZONES?: DeliveryZoneSeed[];
@@ -287,32 +319,154 @@ export const mockDb = {
 
   // Shifts
   getCurrentShift: () => globalStore.__RIMJHIM_CURRENT_SHIFT,
+  getShiftHistory: () => globalStore.__RIMJHIM_SHIFT_HISTORY || [],
 
   openShift: (cashierName: string, openingCash: number) => {
+    const d = new Date();
+    const dateStr = d.toISOString().slice(2, 10).replace(/-/g, "");
+    const shiftNo = `SH-${dateStr}-${(globalStore.__RIMJHIM_SHIFT_HISTORY?.length || 0) + 1}`;
+
     const shift: ShiftRecord = {
       id: `shift-${Date.now()}`,
+      shiftNo,
       openedBy: cashierName,
-      openedAt: new Date().toISOString(),
+      openedAt: d.toISOString(),
       openingCash,
       status: "OPEN",
+      transactions: [],
+      cashInTotal: 0,
+      safeDropTotal: 0,
+      expensesTotal: 0,
     };
     globalStore.__RIMJHIM_CURRENT_SHIFT = shift;
     return shift;
   },
 
-  closeShift: (cashierName: string, countedCash: number) => {
+  addShiftTransaction: (
+    type: "CASH_IN" | "SAFE_DROP" | "EXPENSE",
+    amount: number,
+    reason: string,
+    staffName: string
+  ) => {
     const current = globalStore.__RIMJHIM_CURRENT_SHIFT;
     if (!current) return null;
 
-    const cashSales = (globalStore.__RIMJHIM_ORDERS || [])
-      .filter((o) => o.paymentMethod === "CASH" && o.status === "COMPLETED")
+    const tx: ShiftTransaction = {
+      id: `tx-${Date.now()}`,
+      shiftId: current.id,
+      type,
+      amount: Math.max(0, amount),
+      reason: reason.trim(),
+      staffName: staffName.trim() || current.openedBy,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!current.transactions) current.transactions = [];
+    current.transactions.push(tx);
+
+    current.cashInTotal = current.transactions
+      .filter((t) => t.type === "CASH_IN")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    current.safeDropTotal = current.transactions
+      .filter((t) => t.type === "SAFE_DROP")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    current.expensesTotal = current.transactions
+      .filter((t) => t.type === "EXPENSE")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    return tx;
+  },
+
+  closeShift: (cashierName: string, countedCash: number, notes?: string) => {
+    const current = globalStore.__RIMJHIM_CURRENT_SHIFT;
+    if (!current) return null;
+
+    const allOrders = globalStore.__RIMJHIM_ORDERS || [];
+    const shiftOrders = allOrders.filter(
+      (o) =>
+        o.status !== "CANCELLED" &&
+        (o.paymentStatus === "PAID" || o.status === "COMPLETED") &&
+        (!current.openedAt || new Date(o.createdAt) >= new Date(current.openedAt))
+    );
+
+    const cashSales = shiftOrders
+      .filter((o) => o.paymentMethod === "CASH")
       .reduce((sum, o) => sum + o.total, 0);
+
+    const cardSales = shiftOrders
+      .filter((o) => o.paymentMethod === "CARD")
+      .reduce((sum, o) => sum + o.total, 0);
+
+    const jazzCashSales = shiftOrders
+      .filter((o) => o.paymentMethod === "JAZZCASH")
+      .reduce((sum, o) => sum + o.total, 0);
+
+    const easyPaisaSales = shiftOrders
+      .filter((o) => o.paymentMethod === "EASYPAISA")
+      .reduce((sum, o) => sum + o.total, 0);
+
+    const totalSales = cashSales + cardSales + jazzCashSales + easyPaisaSales;
+
+    const dineInOrders = shiftOrders.filter((o) => o.type === "DINE_IN");
+    const takeawayOrders = shiftOrders.filter((o) => o.type === "TAKEAWAY");
+    const deliveryOrders = shiftOrders.filter((o) => o.type === "DELIVERY");
+
+    const dineInSales = dineInOrders.reduce((sum, o) => sum + o.total, 0);
+    const takeawaySales = takeawayOrders.reduce((sum, o) => sum + o.total, 0);
+    const deliverySales = deliveryOrders.reduce((sum, o) => sum + o.total, 0);
+
+    const discountsTotal = shiftOrders.reduce((sum, o) => sum + (o.discount || 0), 0);
+    const deliveryFeesTotal = shiftOrders.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
+
+    const cashInTotal = (current.transactions || [])
+      .filter((t) => t.type === "CASH_IN")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const safeDropTotal = (current.transactions || [])
+      .filter((t) => t.type === "SAFE_DROP")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const expensesTotal = (current.transactions || [])
+      .filter((t) => t.type === "EXPENSE")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const netExpectedInDrawer =
+      current.openingCash + cashSales + cashInTotal - safeDropTotal - expensesTotal;
 
     current.closedBy = cashierName;
     current.closedAt = new Date().toISOString();
     current.countedCash = countedCash;
-    current.expectedCash = current.openingCash + cashSales;
+    current.expectedCash = netExpectedInDrawer;
     current.status = "CLOSED";
+    current.notes = notes || undefined;
+    current.cashSales = cashSales;
+    current.cardSales = cardSales;
+    current.jazzCashSales = jazzCashSales;
+    current.easyPaisaSales = easyPaisaSales;
+    current.totalSales = totalSales;
+    current.ordersCount = shiftOrders.length;
+    current.dineInOrdersCount = dineInOrders.length;
+    current.takeawayOrdersCount = takeawayOrders.length;
+    current.deliveryOrdersCount = deliveryOrders.length;
+    current.dineInSales = dineInSales;
+    current.takeawaySales = takeawaySales;
+    current.deliverySales = deliverySales;
+    current.discountsTotal = discountsTotal;
+    current.deliveryFeesTotal = deliveryFeesTotal;
+    current.cashInTotal = cashInTotal;
+    current.safeDropTotal = safeDropTotal;
+    current.expensesTotal = expensesTotal;
+
+    // Archive to history
+    if (!globalStore.__RIMJHIM_SHIFT_HISTORY) {
+      globalStore.__RIMJHIM_SHIFT_HISTORY = [];
+    }
+    globalStore.__RIMJHIM_SHIFT_HISTORY.unshift({ ...current });
+
+    // Reset active shift
+    globalStore.__RIMJHIM_CURRENT_SHIFT = undefined;
 
     return current;
   },
